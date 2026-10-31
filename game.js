@@ -1040,10 +1040,10 @@ function movePlayer(dx, dz) {
 /* ---------- Movement ---------- */
 
 function updateWalking(delta) {
-  const forward = keys.w || keys.arrowup;
-  const backward = keys.s || keys.arrowdown;
-  const left = keys.a || keys.arrowleft;
-  const right = keys.d || keys.arrowright;
+  const forward = keys. s|| keys.arrowup;
+  const backward = keys. w|| keys.arrowdown;
+  const left = keys. d|| keys.arrowleft;
+  const right = keys. a|| keys.arrowright;
 
   let x = 0;
   let z = 0;
@@ -1500,3 +1500,114 @@ drawMap($("#miniMap"));
 camera.position.set(0, 5, 28);
 camera.lookAt(player.position);
 animate();
+
+/* =========================================================
+   MOBILE TOUCH CONTROLS & LANDSCAPE ORIENTATION SYSTEM
+   ========================================================= */
+
+function setupMobileSupport() {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (!isMobile) return;
+
+  const mobileStyles = document.createElement('style');
+  mobileStyles.innerHTML = `
+    #orientation-prompt {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #0f172a; color: #fff; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: sans-serif; text-align: center; padding: 20px;
+    }
+    #orientation-prompt .phone-icon {
+      font-size: 50px; margin-bottom: 20px; animation: rotatePhone 2s infinite ease-in-out;
+    }
+    @keyframes rotatePhone {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+    #mobile-controls {
+      position: fixed; bottom: 20px; left: 0; width: 100%;
+      display: flex; justify-content: space-between; padding: 0 30px;
+      z-index: 9999; user-select: none; -webkit-user-select: none;
+    }
+    .joystick-container {
+      display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
+      gap: 5px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 50%;
+    }
+    .touch-btn {
+      width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%;
+      color: white; font-size: 24px; display: flex; align-items: center;
+      justify-content: center;
+    }
+    .touch-btn:active { background: #6366f1; transform: scale(0.95); }
+    .btn-up { grid-column: 2; grid-row: 1; }
+    .btn-left { grid-column: 1; grid-row: 2; }
+    .btn-right { grid-column: 3; grid-row: 2; }
+    .btn-down { grid-column: 2; grid-row: 3; }
+    .action-container { display: flex; align-items: center; }
+    .btn-action { width: 75px; height: 75px; background: rgba(99, 102, 241, 0.4); border-radius: 50%; font-size: 14px; font-weight: bold;}
+  `;
+  document.head.appendChild(mobileStyles);
+
+  const promptEl = document.createElement('div');
+  promptEl.id = 'orientation-prompt';
+  promptEl.innerHTML = '<div class="phone-icon">📱</div><h2>Please Rotate Your Phone Horizontally</h2><p>This game is designed to be played in landscape mode.</p>';
+  document.body.appendChild(promptEl);
+
+  const controlsEl = document.createElement('div');
+  controlsEl.id = 'mobile-controls';
+  controlsEl.innerHTML = `
+    <div class="joystick-container">
+      <div class="touch-btn btn-up" data-key="w">▲</div>
+      <div class="touch-btn btn-left" data-key="a">◀</div>
+      <div class="touch-btn btn-right" data-key="d">▶</div>
+      <div class="touch-btn btn-down" data-key="s">▼</div>
+    </div>
+    <div class="action-container">
+      <div class="touch-btn btn-action" data-key=" ">ACTION</div>
+    </div>
+  `;
+  document.body.appendChild(controlsEl);
+
+  function handleOrientation() {
+    if (window.innerHeight > window.innerWidth) {
+      promptEl.style.display = 'flex';
+      controlsEl.style.display = 'none';
+    } else {
+      promptEl.style.display = 'none';
+      controlsEl.style.display = 'flex';
+      if(renderer && camera) {
+         camera.aspect = window.innerWidth / window.innerHeight;
+         camera.updateProjectionMatrix();
+         renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    }
+  }
+  window.addEventListener('resize', handleOrientation);
+  handleOrientation();
+
+  function sendVirtualKey(keyName, eventType) {
+    const event = new KeyboardEvent(eventType, {
+      key: keyName,
+      code: 'Key' + keyName.toUpperCase(),
+      bubbles: true,
+      cancelable: true
+    });
+    window.dispatchEvent(event);
+  }
+
+  document.querySelectorAll('.touch-btn').forEach(btn => {
+    const boundKey = btn.getAttribute('data-key');
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      sendVirtualKey(boundKey, 'keydown');
+    });
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      sendVirtualKey(boundKey, 'keyup');
+    });
+  });
+}
+
+setupMobileSupport();
