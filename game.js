@@ -1501,113 +1501,376 @@ camera.position.set(0, 5, 28);
 camera.lookAt(player.position);
 animate();
 
+
 /* =========================================================
-   MOBILE TOUCH CONTROLS & LANDSCAPE ORIENTATION SYSTEM
+   MOBILE CONTROLS - ROBLOX STYLE
+   Uses the existing player, vehicle and camera systems.
    ========================================================= */
 
-function setupMobileSupport() {
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  if (!isMobile) return;
+let mobileStickX = 0;
+let mobileStickY = 0;
+let mobileControlsReady = false;
 
-  const mobileStyles = document.createElement('style');
-  mobileStyles.innerHTML = `
-    #orientation-prompt {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: #0f172a; color: #fff; z-index: 99999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-family: sans-serif; text-align: center; padding: 20px;
-    }
-    #orientation-prompt .phone-icon {
-      font-size: 50px; margin-bottom: 20px; animation: rotatePhone 2s infinite ease-in-out;
-    }
-    @keyframes rotatePhone {
-      0% { transform: rotate(0deg); }
-      50% { transform: rotate(-90deg); }
-      100% { transform: rotate(0deg); }
-    }
+function setupMobileControls() {
+  if (mobileControlsReady) return;
+  mobileControlsReady = true;
+
+  const isTouchDevice =
+    ("ontouchstart" in window) ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia("(pointer: coarse)").matches;
+
+  if (!isTouchDevice) return;
+
+  const style = document.createElement("style");
+  style.textContent = `
     #mobile-controls {
-      position: fixed; bottom: 20px; left: 0; width: 100%;
-      display: flex; justify-content: space-between; padding: 0 30px;
-      z-index: 9999; user-select: none; -webkit-user-select: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-family: Arial, sans-serif;
     }
-    .joystick-container {
-      display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px);
-      gap: 5px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 50%;
+
+    #mobile-camera-zone {
+      position: absolute;
+      right: 0;
+      top: 15%;
+      width: 55%;
+      height: 65%;
+      pointer-events: auto;
+      touch-action: none;
+      background: transparent;
     }
-    .touch-btn {
-      width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 50%;
-      color: white; font-size: 24px; display: flex; align-items: center;
+
+    #mobile-joystick {
+      position: absolute;
+      left: max(24px, env(safe-area-inset-left));
+      bottom: max(28px, env(safe-area-inset-bottom));
+      width: 148px;
+      height: 148px;
+      border-radius: 50%;
+      background: rgba(35, 45, 55, 0.28);
+      border: 2px solid rgba(255,255,255,0.35);
+      box-shadow: inset 0 2px 12px rgba(0,0,0,0.2);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #mobile-joystick::before {
+      content: "";
+      position: absolute;
+      width: 92px;
+      height: 92px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+    }
+
+    #mobile-stick {
+      position: absolute;
+      width: 66px;
+      height: 66px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: linear-gradient(
+        145deg,
+        rgba(255,255,255,0.9),
+        rgba(190,200,210,0.72)
+      );
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.32);
+      pointer-events: none;
+    }
+
+    .mobile-round-button {
+      position: absolute;
+      display: flex;
+      align-items: center;
       justify-content: center;
+      flex-direction: column;
+      border-radius: 50%;
+      pointer-events: auto;
+      touch-action: none;
+      color: white;
+      font-weight: 800;
+      text-align: center;
+      box-sizing: border-box;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
-    .touch-btn:active { background: #6366f1; transform: scale(0.95); }
-    .btn-up { grid-column: 2; grid-row: 1; }
-    .btn-left { grid-column: 1; grid-row: 2; }
-    .btn-right { grid-column: 3; grid-row: 2; }
-    .btn-down { grid-column: 2; grid-row: 3; }
-    .action-container { display: flex; align-items: center; }
-    .btn-action { width: 75px; height: 75px; background: rgba(99, 102, 241, 0.4); border-radius: 50%; font-size: 14px; font-weight: bold;}
-  `;
-  document.head.appendChild(mobileStyles);
 
-  const promptEl = document.createElement('div');
-  promptEl.id = 'orientation-prompt';
-  promptEl.innerHTML = '<div class="phone-icon">📱</div><h2>Please Rotate Your Phone Horizontally</h2><p>This game is designed to be played in landscape mode.</p>';
-  document.body.appendChild(promptEl);
+    #mobile-jump {
+      right: max(28px, env(safe-area-inset-right));
+      bottom: max(35px, env(safe-area-inset-bottom));
+      width: 76px;
+      height: 76px;
+      background: rgba(45, 135, 245, 0.88);
+      border: 3px solid rgba(255,255,255,0.85);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      font-size: 13px;
+    }
 
-  const controlsEl = document.createElement('div');
-  controlsEl.id = 'mobile-controls';
-  controlsEl.innerHTML = `
-    <div class="joystick-container">
-      <div class="touch-btn btn-up" data-key="w">▲</div>
-      <div class="touch-btn btn-left" data-key="a">◀</div>
-      <div class="touch-btn btn-right" data-key="d">▶</div>
-      <div class="touch-btn btn-down" data-key="s">▼</div>
-    </div>
-    <div class="action-container">
-      <div class="touch-btn btn-action" data-key=" ">ACTION</div>
-    </div>
-  `;
-  document.body.appendChild(controlsEl);
+    #mobile-action {
+      display: none;
+      right: max(35px, env(safe-area-inset-right));
+      bottom: max(128px, calc(env(safe-area-inset-bottom) + 115px));
+      width: 72px;
+      height: 72px;
+      padding: 4px;
+      overflow: hidden;
+      background: rgba(35, 165, 95, 0.94);
+      border: 3px solid rgba(255,255,255,0.9);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      font-size: 10px;
+      line-height: 1.1;
+    }
 
-  function handleOrientation() {
-    if (window.innerHeight > window.innerWidth) {
-      promptEl.style.display = 'flex';
-      controlsEl.style.display = 'none';
-    } else {
-      promptEl.style.display = 'none';
-      controlsEl.style.display = 'flex';
-      if(renderer && camera) {
-         camera.aspect = window.innerWidth / window.innerHeight;
-         camera.updateProjectionMatrix();
-         renderer.setSize(window.innerWidth, window.innerHeight);
+    .mobile-round-button:active {
+      transform: scale(0.93);
+      filter: brightness(1.15);
+    }
+
+    @media (orientation: portrait) {
+      #mobile-controls {
+        display: none;
       }
     }
-  }
-  window.addEventListener('resize', handleOrientation);
-  handleOrientation();
+  `;
+  document.head.appendChild(style);
 
-  function sendVirtualKey(keyName, eventType) {
-    const event = new KeyboardEvent(eventType, {
-      key: keyName,
-      code: 'Key' + keyName.toUpperCase(),
-      bubbles: true,
-      cancelable: true
-    });
-    window.dispatchEvent(event);
+  const controls = document.createElement("div");
+  controls.id = "mobile-controls";
+
+  controls.innerHTML = `
+    <div id="mobile-camera-zone"></div>
+
+    <div id="mobile-joystick">
+      <div id="mobile-stick"></div>
+    </div>
+
+    <button id="mobile-jump" class="mobile-round-button"
+      type="button">JUMP</button>
+
+    <button id="mobile-action" class="mobile-round-button"
+      type="button">ENTER<br>CAR</button>
+  `;
+
+  document.body.appendChild(controls);
+
+  const joystick = document.getElementById("mobile-joystick");
+  const stick = document.getElementById("mobile-stick");
+  const jumpButton = document.getElementById("mobile-jump");
+  const actionButton = document.getElementById("mobile-action");
+  const cameraZone = document.getElementById("mobile-camera-zone");
+
+  let joystickPointer = null;
+  let cameraPointer = null;
+  let lastCameraX = 0;
+  let lastCameraY = 0;
+
+  const maxStickDistance = 43;
+
+  function resetJoystick() {
+    mobileStickX = 0;
+    mobileStickY = 0;
+    joystickPointer = null;
+
+    stick.style.left = "50%";
+    stick.style.top = "50%";
   }
 
-  document.querySelectorAll('.touch-btn').forEach(btn => {
-    const boundKey = btn.getAttribute('data-key');
-    btn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      sendVirtualKey(boundKey, 'keydown');
-    });
-    btn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      sendVirtualKey(boundKey, 'keyup');
-    });
+  function moveJoystick(event) {
+    const rect = joystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    let dx = event.clientX - centerX;
+    let dy = event.clientY - centerY;
+
+    const distance = Math.hypot(dx, dy);
+
+    if (distance > maxStickDistance) {
+      dx = (dx / distance) * maxStickDistance;
+      dy = (dy / distance) * maxStickDistance;
+    }
+
+    mobileStickX = dx / maxStickDistance;
+    mobileStickY = dy / maxStickDistance;
+
+    stick.style.left =
+      `calc(50% + ${dx}px)`;
+
+    stick.style.top =
+      `calc(50% + ${dy}px)`;
+  }
+
+  joystick.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+
+    if (joystickPointer !== null) return;
+
+    joystickPointer = event.pointerId;
+    joystick.setPointerCapture(event.pointerId);
+    moveJoystick(event);
+  });
+
+  joystick.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== joystickPointer) return;
+    event.preventDefault();
+    moveJoystick(event);
+  });
+
+  joystick.addEventListener("pointerup", (event) => {
+    if (event.pointerId !== joystickPointer) return;
+    resetJoystick();
+  });
+
+  joystick.addEventListener("pointercancel", resetJoystick);
+  joystick.addEventListener("lostpointercapture", resetJoystick);
+
+  /* Jump button */
+  function releaseJump() {
+    keys.space = false;
+  }
+
+  jumpButton.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    keys.space = true;
+
+    try {
+      jumpButton.setPointerCapture(event.pointerId);
+    } catch (_) {}
+  });
+
+  jumpButton.addEventListener("pointerup", releaseJump);
+  jumpButton.addEventListener("pointercancel", releaseJump);
+  jumpButton.addEventListener("lostpointercapture", releaseJump);
+
+  /* Camera swipe - no visible instruction text */
+  cameraZone.addEventListener("pointerdown", (event) => {
+    if (cameraPointer !== null) return;
+
+    cameraPointer = event.pointerId;
+    lastCameraX = event.clientX;
+    lastCameraY = event.clientY;
+
+    cameraZone.setPointerCapture(event.pointerId);
+  });
+
+  cameraZone.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== cameraPointer) return;
+
+    const dx = event.clientX - lastCameraX;
+    const dy = event.clientY - lastCameraY;
+
+    lastCameraX = event.clientX;
+    lastCameraY = event.clientY;
+
+    const sensitivityElement = $("#sensitivityControl");
+    const sensitivity = sensitivityElement
+      ? Number(sensitivityElement.value) / 5
+      : 1;
+
+    playerState.yaw -= dx * 0.004 * sensitivity;
+
+    playerState.pitch = THREE.MathUtils.clamp(
+      playerState.pitch - dy * 0.003 * sensitivity,
+      -0.8,
+      0.45
+    );
+
+    event.preventDefault();
+  });
+
+  function stopCamera(event) {
+    if (event.pointerId !== cameraPointer) return;
+    cameraPointer = null;
+  }
+
+  cameraZone.addEventListener("pointerup", stopCamera);
+  cameraZone.addEventListener("pointercancel", stopCamera);
+  cameraZone.addEventListener("lostpointercapture", stopCamera);
+
+  /* Enter/exit car button */
+  actionButton.addEventListener("click", (event) => {
+    event.preventDefault();
+
+    if (playerState.driving) {
+      exitVehicle();
+    } else {
+      getNearbyObjects();
+
+      if (currentVehicle) {
+        enterVehicle(currentVehicle);
+      }
+    }
+
+    updateMobileActionButton();
+  });
+
+  /* Release controls if the browser loses focus */
+  window.addEventListener("blur", () => {
+    resetJoystick();
+    releaseJump();
+    cameraPointer = null;
+  });
+
+  window.addEventListener("contextmenu", (event) => {
+    if (event.target.closest("#mobile-controls")) {
+      event.preventDefault();
+    }
   });
 }
 
-setupMobileSupport();
+/* Map joystick direction to the existing keyboard controls.
+   This preserves the original walking and driving systems. */
+function updateMobileJoystickKeys() {
+  if (!document.getElementById("mobile-controls")) return;
+
+  const deadZone = 0.18;
+
+  const up = mobileStickY < -deadZone;
+  const down = mobileStickY > deadZone;
+  const left = mobileStickX < -deadZone;
+  const right = mobileStickX > deadZone;
+
+  if (playerState.driving) {
+    // Driving: up accelerates, down reverses.
+    keys.w = up;
+    keys.s = down;
+    keys.a = left;
+    keys.d = right;
+  } else {
+    // Walking: preserve the original game's direction mapping.
+    keys.s = up;
+    keys.w = down;
+    keys.d = left;
+    keys.a = right;
+  }
+}
+
+/* Show the circular car button only when a car is nearby. */
+function updateMobileActionButton() {
+  const button = document.getElementById("mobile-action");
+  if (!button) return;
+
+  if (playerState.driving) {
+    button.style.display = "flex";
+    button.innerHTML = "EXIT<br>CAR";
+  } else if (currentVehicle && !playerState.inside) {
+    button.style.display = "flex";
+    button.innerHTML = "ENTER<br>CAR";
+  } else {
+    button.style.display = "none";
+  }
+}
