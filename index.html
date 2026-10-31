@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greenfield City 3D</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div id="hud">
+    <div class="topbar">
+      <div>
+        <strong>GREENFIELD</strong>
+        <span id="locationLabel">City Centre</span>
+      </div>
+      <div class="top-actions">
+        <span id="timeLabel">Day</span>
+        <button id="mapButton" title="Open map">MAP</button>
+        <button id="settingsButton" title="Settings">⚙</button>
+      </div>
+    </div>
+
+    <div id="miniMapWrap">
+      <canvas id="miniMap" width="180" height="180"></canvas>
+    </div>
+
+    <div id="prompt"></div>
+    <div id="dialogue"></div>
+    <div id="crosshair">+</div>
+  </div>
+
+  <div id="mapOverlay" class="overlay hidden">
+    <div class="panel map-panel">
+      <div class="panel-heading">
+        <h2>World Map</h2>
+        <button id="closeMap">✕</button>
+      </div>
+      <canvas id="largeMap" width="900" height="650"></canvas>
+      <p>Explore the city, village, lake, mountains and airport.</p>
+    </div>
+  </div>
+
+  <div id="settingsOverlay" class="overlay hidden">
+    <div class="panel settings-panel">
+      <div class="panel-heading">
+        <h2>Settings</h2>
+        <button id="closeSettings">✕</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="gameTab">Game</button>
+        <button class="tab" data-tab="displayTab">Display</button>
+        <button class="tab" data-tab="controlsTab">Controls</button>
+      </div>
+
+      <section id="gameTab" class="tab-content">
+        <label>Walking speed <input id="speedControl" type="range" min="3" max="12" value="6"></label>
+        <label>Mouse sensitivity <input id="sensitivityControl" type="range" min="1" max="10" value="5"></label>
+        <label><input id="promptsToggle" type="checkbox" checked> Show interaction prompts</label>
+        <button id="resetPosition">Reset player position</button>
+      </section>
+
+      <section id="displayTab" class="tab-content hidden">
+        <label>Graphics quality
+          <select id="qualityControl">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+        <label><input id="shadowsToggle" type="checkbox" checked> Shadows</label>
+        <label><input id="crosshairToggle" type="checkbox" checked> Crosshair</label>
+      </section>
+
+      <section id="controlsTab" class="tab-content hidden">
+        <h3>On foot</h3>
+        <p><b>W A S D</b> — Walk</p>
+        <p><b>SHIFT</b> — Run</p>
+        <p><b>SPACE</b> — Jump</p>
+        <p><b>MOUSE</b> — Look around</p>
+        <p><b>E</b> — Talk, enter a vehicle or interact</p>
+        <h3>Driving</h3>
+        <p><b>W / S</b> — Accelerate / reverse</p>
+        <p><b>A / D</b> — Steer</p>
+        <p><b>MOUSE</b> — Look and steer</p>
+        <p><b>E</b> — Exit vehicle</p>
+        <h3>World</h3>
+        <p><b>M</b> — Open map</p>
+        <p><b>ESC</b> — Release mouse / close settings</p>
+      </section>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
