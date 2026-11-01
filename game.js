@@ -141,49 +141,134 @@ function groundPlane(size, mat, x = 0, z = 0) {
 
 groundPlane(1500, M.grass);
 
-/* ---------- City roads ---------- */
-
 const roadLines = [-150, -100, -50, 0, 50, 100, 150];
 const roadWidth = 14;
 const cityLimit = 180;
 
-for (const line of roadLines) {
-  box(world, line, 0.01, 0, roadWidth, 0.12, cityLimit * 2, M.road, false);
-  box(world, 0, 0.01, line, cityLimit * 2, 0.12, roadWidth, M.road, false);
+const sidewalkWidth = 3;
+const sidewalkOffset = roadWidth / 2 + sidewalkWidth / 2;
+const intersectionGap = roadWidth + 8;
 
+// Roads
+for (const line of roadLines) {
+
+  // Main vertical and horizontal roads
+  box(
+    world,
+    line, 0.01, 0,
+    roadWidth, 0.12, cityLimit * 2,
+    M.road, false
+  );
+
+  box(
+    world,
+    0, 0.01, line,
+    cityLimit * 2, 0.12, roadWidth,
+    M.road, false
+  );
+
+  // Dashed road centre lines with intersection gaps
   for (let p = -cityLimit + 5; p < cityLimit; p += 15) {
-    box(world, line, 0.085, p, 0.18, 0.025, 6, M.roadLine, false);
-    box(world, p, 0.085, line, 6, 0.025, 0.18, M.roadLine, false);
+
+    const nearIntersection = roadLines.some(
+      r => Math.abs(p - r) < intersectionGap
+    );
+
+    if (!nearIntersection) {
+      box(
+        world,
+        line, 0.085, p,
+        0.18, 0.025, 6,
+        M.roadLine, false
+      );
+
+      box(
+        world,
+        p, 0.085, line,
+        6, 0.025, 0.18,
+        M.roadLine, false
+      );
+    }
   }
 
+  // Sidewalks with gaps at intersections
   for (const side of [-1, 1]) {
-    box(
-      world,
-      line + side * (roadWidth / 2 + 1.5),
-      0.09, 0,
-      3, 0.2, cityLimit * 2,
-      M.sidewalk, false
-    );
 
-    box(
-      world,
-      0, 0.09,
-      line + side * (roadWidth / 2 + 1.5),
-      cityLimit * 2, 0.2, 3,
-      M.sidewalk, false
-    );
+    const sidewalkX = line + side * sidewalkOffset;
+
+    // Vertical sidewalk segments
+    for (let i = 0; i < roadLines.length - 1; i++) {
+      const start = roadLines[i] + intersectionGap / 2;
+      const end = roadLines[i + 1] - intersectionGap / 2;
+
+      box(
+        world,
+        sidewalkX,
+        0.09,
+        (start + end) / 2,
+        sidewalkWidth,
+        0.2,
+        end - start,
+        M.sidewalk,
+        false
+      );
+    }
+
+    // Horizontal sidewalk segments
+    const sidewalkZ = line + side * sidewalkOffset;
+
+    for (let i = 0; i < roadLines.length - 1; i++) {
+      const start = roadLines[i] + intersectionGap / 2;
+      const end = roadLines[i + 1] - intersectionGap / 2;
+
+      box(
+        world,
+        (start + end) / 2,
+        0.09,
+        sidewalkZ,
+        end - start,
+        0.2,
+        sidewalkWidth,
+        M.sidewalk,
+        false
+      );
+    }
   }
 }
 
 // Crosswalks
 for (const x of [-100, 0, 100]) {
   for (const z of [-100, 0, 100]) {
+
     for (let i = -4; i <= 4; i++) {
-      box(world, x + i * 1.05, 0.09, z - 9, 0.65, 0.025, 2.8, M.white, false);
-      box(world, x - 9, 0.09, z + i * 1.05, 2.8, 0.025, 0.65, M.white, false);
+
+      box(
+        world,
+        x + i * 1.05,
+        0.09,
+        z - 9,
+        0.65,
+        0.025,
+        2.8,
+        M.white,
+        false
+      );
+
+      box(
+        world,
+        x - 9,
+        0.09,
+        z + i * 1.05,
+        2.8,
+        0.025,
+        0.65,
+        M.white,
+        false
+      );
     }
   }
 }
+/* ---------- Trees and street lamps ---------- */
 
 /* ---------- Trees and street lamps ---------- */
 
@@ -198,6 +283,7 @@ function makeTree(x, z, scale = 1) {
   cone(tree, 0, 4.0, 0, 0.95, 2.1, M.leafLight, 7);
 }
 
+// Trees
 for (let i = 0; i < 250; i++) {
   const x = -420 + Math.random() * 840;
   const z = -420 + Math.random() * 840;
@@ -210,19 +296,53 @@ for (let i = 0; i < 250; i++) {
   }
 }
 
-function makeLamp(x, z) {
-  cylinder(world, x, 2.5, z, 0.08, 0.12, 5, M.metal);
-  box(world, x + 0.55, 4.9, z, 1.1, 0.09, 0.09, M.metal);
-  sphere(world, x + 1.0, 4.8, z, 0.22, material(0xffedb2));
+// Street lamps
+function makeLamp(x, z, rotation = 0) {
+  const lamp = new THREE.Group();
+  lamp.position.set(x, 0, z);
+  lamp.rotation.y = rotation;
+  world.add(lamp);
+
+  // Lamp pole
+  cylinder(lamp, 0, 2.5, 0, 0.08, 0.12, 5, M.metal);
+
+  // Lamp arm
+  box(lamp, 0.55, 4.9, 0, 1.1, 0.09, 0.09, M.metal);
+
+  // Lamp light
+  sphere(
+    lamp,
+    1.0,
+    4.8,
+    0,
+    0.22,
+    material(0xffedb2)
+  );
 }
+
+// Place lamps along the sidewalks
+const lampOffset = roadWidth / 2 + 3.5;
 
 for (const line of roadLines) {
+
   for (let p = -140; p <= 140; p += 40) {
-    makeLamp(line + 10, p + 10);
-    makeLamp(p - 10, line - 10);
+
+    // Avoid placing lamps directly at intersections
+    const nearIntersection = roadLines.some(
+      r => Math.abs(p - r) < 16
+    );
+
+    if (nearIntersection) continue;
+
+    // Vertical road: both sides
+    makeLamp(line + lampOffset, p, Math.PI);
+    makeLamp(line - lampOffset, p, 0);
+
+    // Horizontal road: both sides
+    makeLamp(p, line + lampOffset, -Math.PI / 2);
+    makeLamp(p, line - lampOffset, Math.PI / 2);
   }
 }
-
 /* ---------- City buildings ---------- */
 
 const buildings = [];
