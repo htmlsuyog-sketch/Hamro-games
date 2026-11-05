@@ -61,9 +61,23 @@ function material(color, roughness = 0.85, metalness = 0) {
 const M = {
   grass: material(0x73ad61),
   grass2: material(0x8abd70),
-  road: material(0x41474d),
-  roadLine: material(0xf0df8a),
-  sidewalk: material(0xc8c8c0),
+  
+road: new THREE.MeshStandardMaterial({
+  color: 0x34383c,
+  roughness: 0.96,
+  metalness: 0
+}),
+
+roadLine: new THREE.MeshStandardMaterial({
+  color: 0xf8e9a5,
+  roughness: 0.65
+}),
+
+sidewalk: new THREE.MeshStandardMaterial({
+  color: 0xb9b9b5,
+  roughness: 0.92
+}),
+
   white: material(0xf2f0e8),
   dark: material(0x20282e),
   glass: new THREE.MeshStandardMaterial({
@@ -140,6 +154,60 @@ function groundPlane(size, mat, x = 0, z = 0) {
 }
 
 groundPlane(1500, M.grass);
+
+/* ---------- Realistic asphalt texture ---------- */
+
+function createAsphaltTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 512;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#34383c";
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Tiny asphalt stones
+  for (let i = 0; i < 18000; i++) {
+    const shade = Math.random() * 45 + 35;
+
+    ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+
+    ctx.fillRect(
+      Math.random() * 512,
+      Math.random() * 512,
+      Math.random() * 2 + 0.3,
+      Math.random() * 2 + 0.3
+    );
+  }
+
+  // Very subtle road wear
+  for (let i = 0; i < 70; i++) {
+    ctx.fillStyle = "rgba(10,10,10,0.035)";
+    ctx.fillRect(
+      Math.random() * 512,
+      Math.random() * 512,
+      Math.random() * 100 + 10,
+      Math.random() * 4 + 1
+    );
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 12);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+
+  return texture;
+}
+
+const asphaltTexture = createAsphaltTexture();
+
+M.road.map = asphaltTexture;
+M.road.color.set(0xffffff);
+M.road.needsUpdate = true;
+
 
 const roadLines = [-150, -100, -50, 0, 50, 100, 150];
 const roadWidth = 14;
@@ -345,6 +413,12 @@ for (const line of roadLines) {
 }
 /* ---------- City buildings ---------- */
 
+
+/* ============================================================
+   GREENFIELD CITY 3D - COMPLETE BUILDING SYSTEM
+   Unique interiors, shop designs, windows and front signs
+============================================================ */
+
 const buildings = [];
 const buildingColliders = [];
 
@@ -370,228 +444,523 @@ const shopSigns = [
   ["LUXE WATCHES", 0x28231b]
 ];
 
-function addSign(parent, label, color, width = 9) {
-  const signMat = material(color);
-  const sign = box(parent, 0, 3.6, -10.18, width, 1.05, 0.22, signMat);
-  sign.position.z = -10.2;
+const B = {
+  glass: new THREE.MeshStandardMaterial({
+    color: 0x91c6d9,
+    metalness: 0.35,
+    roughness: 0.18
+  }),
+  darkGlass: new THREE.MeshStandardMaterial({
+    color: 0x243b49,
+    metalness: 0.55,
+    roughness: 0.2
+  }),
+  frame: material(0x303b43),
+  gold: material(0xc5a35b),
+  white: material(0xf1eee5),
+  wood: material(0x795034),
+  metal: material(0x626d75)
+};
 
+function bBox(parent, x, y, z, w, h, d, color) {
+  return box(parent, x, y, z, w, h, d, material(color));
+}
+
+function bPoster(parent, label, x, y, z, color) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
-  canvas.height = 128;
+  canvas.height = 160;
+
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#" + color.toString(16).padStart(6, "0");
-  ctx.fillRect(0, 0, 512, 128);
-  ctx.fillStyle = "#fff2b6";
-  ctx.font = "bold 44px Arial";
+  ctx.fillRect(0, 0, 512, 160);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 38px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(label, 256, 64);
+  ctx.fillText(label.toUpperCase(), 256, 80);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const face = new THREE.Mesh(
-    new THREE.PlaneGeometry(width - 0.3, 0.8),
+
+  const poster = new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 1.25),
     new THREE.MeshBasicMaterial({ map: texture })
   );
-  face.position.set(0, 3.6, -10.075);
-  parent.add(face);
+
+  poster.position.set(x, y, z);
+  parent.add(poster);
+  return poster;
 }
+
+/* ---------- Front-facing signboards ---------- */
+
+function addSign(parent, label, color, width = 12) {
+  const sign = new THREE.Group();
+  sign.position.set(0, 3.8, -10.38);
+
+  bBox(sign, 0, 0, 0, width, 1.15, 0.22, color);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 180;
+
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#" + color.toString(16).padStart(6, "0");
+  ctx.fillRect(0, 0, 1024, 180);
+
+  ctx.strokeStyle = "#f5dfad";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(6, 6, 1012, 168);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 66px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label.toUpperCase(), 512, 90);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const face = new THREE.Mesh(
+    new THREE.PlaneGeometry(width - 0.3, 1),
+    new THREE.MeshBasicMaterial({ map: texture })
+  );
+
+  // Front of building is -Z.
+  face.rotation.y = Math.PI;
+  face.position.z = -0.125;
+
+  sign.add(face);
+  parent.add(sign);
+
+  return sign;
+}
+
+/* ---------- Furniture ---------- */
+
+function bCounter(room, x, z, width, color = 0x795034) {
+  bBox(room, x, 0.65, z, width, 1.3, 1.1, color);
+  bBox(room, x, 1.34, z, width + 0.15, 0.12, 1.25, 0xe0d5bd);
+}
+
+function bShelf(room, x, z, color = 0x795034) {
+  bBox(room, x, 1.5, z, 2.7, 3, 0.65, color);
+
+  for (let y = 0.65; y < 2.8; y += 0.65) {
+    bBox(room, x, y, z - 0.36, 2.6, 0.08, 0.8, 0xe6dfd1);
+  }
+}
+
+function bTable(room, x, z, color = 0x95623d) {
+  cylinder(room, x, 0.9, z, 0.85, 0.85, 0.16, material(color), 20);
+
+  for (const dx of [-0.6, 0.6]) {
+    for (const dz of [-0.6, 0.6]) {
+      cylinder(
+        room, x + dx, 0.4, z + dz,
+        0.07, 0.07, 0.8, B.metal
+      );
+    }
+  }
+}
+
+function bSofa(room, x, z, color = 0x526d82) {
+  bBox(room, x, 0.65, z, 3.5, 0.8, 1.2, color);
+  bBox(room, x, 1.2, z + 0.45, 3.5, 1, 0.3, color);
+
+  for (const dx of [-1.5, 1.5]) {
+    bBox(room, x + dx, 1.1, z, 0.35, 0.8, 1, color);
+  }
+}
+
+/* ---------- Shop products ---------- */
+
+function bProduct(room, x, y, z, color) {
+  bBox(room, x, y, z, 0.4, 0.65, 0.35, color);
+}
+
+/* ---------- Unique interior creation ---------- */
 
 function createInterior(building, kind, signName) {
   const room = new THREE.Group();
-  room.position.copy(building.position);
+
+  room.position.set(building.x, 0, building.z);
   room.visible = false;
   world.add(room);
 
-  const floorMat = material(0xd1cec5);
-  const wallMat = material(0xece9e1);
-  const darkWall = material(0x514332);
+  const floorColors = {
+    "Electronics Store": 0x9baeb4,
+    "Clothing Store": 0xd5c8b4,
+    "Pizza Planet": 0xc9a77e,
+    "Burger Bar": 0x8b674d,
+    "Grocery Shop": 0xc8c9a9,
+    "Book Shop": 0x927d68,
+    "Travel Agency": 0xc7d7d4,
+    "Watch Shop": 0xaaa69b,
+    "Home": 0x9d876c,
+    "Bank": 0xb7b4a8,
+    "Hospital": 0xe6e8e4,
+    "Medical Centre": 0xe6e8e4,
+    "Apartment": 0xaaa69d,
+    "Office Tower": 0xaab5bb
+  };
 
-  const w = 20;
-  const d = 20;
-  const h = 6;
+  const floor = floorColors[kind] ?? 0xc4b9a6;
+  const wall = kind === "Hospital" ||
+    kind === "Medical Centre" ? 0xf3f4f0 : 0xe9e2d6;
 
-  box(room, 0, 0.04, 0, w, 0.15, d, floorMat, false);
-  box(room, 0, h / 2, 10, w, h, 0.3, wallMat);
-  box(room, -10, h / 2, 0, 0.3, h, d, wallMat);
-  box(room, 10, h / 2, 0, 0.3, h, d, wallMat);
+  // Floor and walls.
+  bBox(room, 0, -0.05, 0, 20, 0.2, 20, floor);
 
-  // Back wall. The front is left open as a doorway.
-  box(room, -7, h / 2, -10, 6, h, 0.3, wallMat);
-  box(room, 7, h / 2, -10, 6, h, 0.3, wallMat);
-  box(room, 0, h - 0.1, -10, 8, 0.3, 0.3, wallMat);
-  box(room, 0, h + 0.05, 0, w, 0.2, d, wallMat);
+  bBox(room, -10, 3, 0, 0.25, 6, 20, wall);
+  bBox(room, 10, 3, 0, 0.25, 6, 20, wall);
+  bBox(room, 0, 3, 10, 20, 6, 0.25, wall);
 
-  const ceilingLight = new THREE.PointLight(0xffe7bd, 24, 28);
-  ceilingLight.position.set(0, 4.8, 0);
-  room.add(ceilingLight);
+  // Front wall with open doorway.
+  bBox(room, -7, 3, -10, 6, 6, 0.25, wall);
+  bBox(room, 7, 3, -10, 6, 6, 0.25, wall);
+  bBox(room, 0, 5.85, -10, 8, 0.3, 0.25, wall);
 
-  // Shop-specific furniture and displays.
+  // Ceiling.
+  bBox(room, 0, 6.1, 0, 20, 0.2, 20, 0xd9d8d1);
+
+  // Interior lights.
+  for (const x of [-6, 0, 6]) {
+    const light = new THREE.PointLight(0xffe8c5, 13, 18);
+    light.position.set(x, 4.8, 0);
+    room.add(light);
+
+    bBox(room, x, 5.95, 0, 1.3, 0.08, 0.45, 0xffffff);
+  }
+
+  /* ELECTRONICS STORE */
+
   if (kind === "Electronics Store") {
-    box(room, 0, 0.65, -4, 12, 1.25, 2.1, material(0x374c5a));
-    box(room, 0, 1.35, -4, 11.6, 0.12, 1.8, material(0x9ccbdc));
+    bCounter(room, 0, -6, 12, 0x344e5b);
 
     for (let i = 0; i < 5; i++) {
-      box(room, -4.5 + i * 2.25, 1.65, -4, 0.75, 0.48, 0.12, material(0x1d2731));
-      box(room, -4.5 + i * 2.25, 1.68, -3.92, 0.62, 0.32, 0.025, material(0x68b4dc));
+      const x = -4.5 + i * 2.25;
+
+      bBox(room, x, 1.95, -6.5, 0.8, 0.95, 0.12, 0x172b36);
+      bBox(room, x, 1.95, -6.42, 0.68, 0.75, 0.025, 0x42b8e0);
     }
 
-    box(room, -5, 1.2, 3, 5, 2.2, 0.5, material(0x455a64));
-    box(room, 5, 1.2, 3, 5, 2.2, 0.5, material(0x455a64));
-    for (let i = 0; i < 3; i++) {
-      box(room, -5, 0.55 + i * 0.6, 3.3, 5, 0.08, 0.5, M.white);
-      box(room, 5, 0.55 + i * 0.6, 3.3, 5, 0.08, 0.5, M.white);
-    }
-  } else if (kind === "Clothing Store") {
+    bShelf(room, -7, 2, 0x3e515a);
+    bShelf(room, 7, 2, 0x3e515a);
+
+    bPoster(room, "LATEST PHONES", 0, 4.4, 9.85, 0x174b64);
+    bPoster(room, "GAMING & AUDIO", -7, 3.8, -9.85, 0x174b64);
+  }
+
+  /* CLOTHING STORE */
+
+  else if (kind === "Clothing Store") {
+    bCounter(room, 0, 6, 8, 0x80543c);
+
     for (const x of [-6, -2, 2, 6]) {
-      cylinder(room, x, 2.3, -3, 0.06, 0.06, 5, M.metal);
-      box(room, x, 3.5, -3, 2.4, 0.1, 0.1, M.metal);
-      for (let i = 0; i < 3; i++) {
-        const shirt = box(
-          room, x - 0.7 + i * 0.7, 2.65, -3,
-          0.55, 1.0, 0.16,
-          material([0xd84d54, 0x3978c0, 0x54a56a][i])
+      bBox(room, x, 3, -4, 0.12, 0.12, 5, 0x50575c);
+
+      for (let i = 0; i < 4; i++) {
+        bProduct(
+          room,
+          x - 0.5 + i * 0.33,
+          2.2,
+          -4,
+          [0xd64e61, 0x3476bb, 0x51a36c, 0xe4ba45][i]
         );
       }
     }
-    box(room, 0, 0.6, 5, 8, 1.2, 1.5, M.wood);
-  } else if (kind === "Pizza Planet" || kind === "Burger Bar") {
-    box(room, 0, 0.65, -6, 12, 1.3, 1.4, material(0x865335));
-    for (const x of [-5, 0, 5]) {
-      for (const z of [-1, 4]) {
-        cylinder(room, x, 0.8, z, 1.0, 1.0, 0.18, material(0x9a603b), 16);
-        for (const dx of [-0.65, 0.65]) {
-          for (const dz of [-0.65, 0.65]) {
-            cylinder(room, x + dx, 0.35, z + dz, 0.07, 0.07, 0.7, M.black);
-          }
-        }
-      }
-    }
-  } else {
-    box(room, 0, 0.65, -5, 12, 1.3, 1.3, material(0x805438));
-    for (let i = 0; i < 5; i++) {
-      box(room, -7 + i * 3.5, 1.6, 4, 2.5, 2.7, 0.5, M.wood);
-      box(room, -7 + i * 3.5, 1.0, 3.7, 2.4, 0.08, 0.8, M.white);
-    }
+
+    bPoster(room, "NEW COLLECTION", 0, 4.4, 9.85, 0x8b3760);
+    bPoster(room, "SALE 50%", -7, 3.8, -9.85, 0x8b3760);
   }
 
-  // Interior wall posters/signs.
-  const posterCanvas = document.createElement("canvas");
-  posterCanvas.width = 512;
-  posterCanvas.height = 160;
-  const pctx = posterCanvas.getContext("2d");
-  pctx.fillStyle = "#243e51";
-  pctx.fillRect(0, 0, 512, 160);
-  pctx.fillStyle = "#fff0ba";
-  pctx.font = "bold 42px Arial";
-  pctx.textAlign = "center";
-  pctx.fillText(signName.toUpperCase(), 256, 94);
-  const poster = new THREE.Mesh(
-    new THREE.PlaneGeometry(5, 1.5),
-    new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(posterCanvas)
-    })
-  );
-  poster.position.set(0, 4.4, 9.82);
-  room.add(poster);
+  /* PIZZA PLANET */
+
+  else if (kind === "Pizza Planet") {
+    bCounter(room, 0, -6, 12, 0x9b4e2f);
+
+    for (const x of [-5, 0, 5]) {
+      bTable(room, x, 2);
+      bTable(room, x, 6);
+    }
+
+    bPoster(room, "HOT FRESH PIZZA", 0, 4.4, 9.85, 0xa52d20);
+  }
+
+  /* BURGER BAR */
+
+  else if (kind === "Burger Bar") {
+    bCounter(room, 0, -6, 12, 0x613b25);
+
+    for (const x of [-5, 0, 5]) {
+      bTable(room, x, 2, 0x85502f);
+      bTable(room, x, 6, 0x85502f);
+    }
+
+    bPoster(room, "BEST BURGERS", 0, 4.4, 9.85, 0x98451e);
+  }
+
+  /* GROCERY SHOP */
+
+  else if (kind === "Grocery Shop") {
+    bCounter(room, 0, -6, 8, 0x416c40);
+
+    for (const x of [-7, -3, 3, 7]) {
+      bShelf(room, x, 3, 0x477247);
+
+      for (let i = 0; i < 4; i++) {
+        bProduct(
+          room,
+          x - 0.8 + i * 0.5,
+          1.4,
+          2.55,
+          [0x56a05c, 0xd8a33c, 0xc65345, 0x4a8cae][i]
+        );
+      }
+    }
+
+    bPoster(room, "FRESH FOOD DAILY", 0, 4.4, 9.85, 0x387c48);
+  }
+
+  /* BOOK SHOP */
+
+  else if (kind === "Book Shop") {
+    for (const x of [-7, -3, 3, 7]) {
+      bShelf(room, x, 2, 0x65452e);
+
+      for (let i = 0; i < 4; i++) {
+        bBox(
+          room,
+          x - 0.8 + i * 0.5,
+          2,
+          1.55,
+          0.35,
+          1.1,
+          0.12,
+          [0x9b3028, 0x315d9b, 0x4d804a, 0xb58b3a][i]
+        );
+      }
+    }
+
+    bCounter(room, 0, -6, 7);
+    bPoster(room, "BOOK WORLD", 0, 4.4, 9.85, 0x465c9a);
+  }
+
+  /* TRAVEL AGENCY */
+
+  else if (kind === "Travel Agency") {
+    bCounter(room, 0, -6, 10, 0x39766d);
+
+    for (const x of [-6, 0, 6]) {
+      bSofa(room, x, 2, 0x357c83);
+    }
+
+    bPoster(room, "EXPLORE THE WORLD", 0, 4.4, 9.85, 0x16716f);
+    bPoster(room, "FLIGHTS & HOLIDAYS", -7, 3.8, -9.85, 0x16716f);
+  }
+
+  /* WATCH SHOP */
+
+  else if (kind === "Watch Shop") {
+    bCounter(room, 0, -5, 12, 0x302d29);
+
+    for (const x of [-6, -2, 2, 6]) {
+      cylinder(
+        room, x, 1.9, -5.3,
+        0.65, 0.65, 0.2, B.gold, 24
+      );
+
+      cylinder(
+        room, x, 2.05, -5.3,
+        0.45, 0.45, 0.08, B.darkGlass, 24
+      );
+    }
+
+    bPoster(room, "LUXURY COLLECTION", 0, 4.4, 9.85, 0x28231b);
+  }
+
+  /* HOMES */
+
+  else if (kind === "Home") {
+    bSofa(room, -4, 3, 0x506c80);
+    bTable(room, -4, 6);
+
+    bBox(room, 5, 0.8, 5, 4, 1.5, 4, 0x92704f);
+    bBox(room, 5, 1.65, 5, 4.1, 0.2, 4.1, 0xe9dfcc);
+
+    bPoster(room, "HOME SWEET HOME", 0, 4.4, 9.85, 0x75553c);
+  }
+
+  /* BANK */
+
+  else if (kind === "Bank") {
+    bCounter(room, 0, -6, 14, 0x665b47);
+    bSofa(room, -5, 3, 0x35485a);
+
+    for (const x of [-5, 0, 5]) {
+      bBox(room, x, 1.5, -6, 0.2, 2.5, 0.2, 0xb99b5d);
+      bBox(room, x, 2.7, -6, 2.5, 0.15, 0.3, 0xb99b5d);
+    }
+
+    bPoster(room, "CITY FINANCE", 0, 4.4, 9.85, 0x6b5735);
+  }
+
+  /* HOSPITAL */
+
+  else if (kind === "Hospital" || kind === "Medical Centre") {
+    bCounter(room, 0, -6, 14, 0xd8ddd8);
+
+    for (const x of [-6, 0, 6]) {
+      bBox(room, x, 0.7, 3, 2.5, 0.4, 4, 0xffffff);
+      bBox(room, x, 1.15, 3, 2.5, 0.12, 4, 0x9ac9d5);
+    }
+
+    bPoster(room, "RECEPTION", 0, 4.4, 9.85, 0x337b91);
+    bPoster(room, "EMERGENCY", -7, 3.8, -9.85, 0x9b3030);
+  }
+
+  /* APARTMENTS */
+
+  else if (kind === "Apartment") {
+    bSofa(room, -4, 3, 0x667c91);
+    bTable(room, -4, 6);
+
+    bBox(room, 5, 0.8, 4, 4, 1.5, 4, 0x755039);
+    bBox(room, 5, 1.7, 4, 4, 0.2, 4, 0xd4c9ae);
+
+    bPoster(room, "APARTMENT LOUNGE", 0, 4.4, 9.85, 0x526777);
+  }
+
+  /* OFFICE TOWER */
+
+  else if (kind === "Office Tower") {
+    bCounter(room, 0, -6, 14, 0x536b79);
+
+    for (const x of [-6, 0, 6]) {
+      bBox(room, x, 1.4, 2, 2.5, 2.8, 1.2, 0x4e6472);
+      bBox(room, x, 2.85, 2, 2.6, 0.12, 1.3, 0x8ba9b5);
+    }
+
+    bPoster(room, "BUSINESS CENTRE", 0, 4.4, 9.85, 0x354a63);
+  }
 
   return room;
 }
 
-function createBuilding(x, z, name, type, height, color, signColor = 0x31566a) {
+/* ---------- Building exterior ---------- */
+
+function createBuilding(
+  x, z, name, type, height, color, signColor = 0x31566a
+) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
   world.add(group);
 
   const w = 20;
   const d = 20;
+
   const wall = material(color);
   const roof = material(0x46535b);
 
-  box(group, 0, height / 2, 0, w, height, d, wall);
-  box(group, 0, height + 0.18, 0, w + 0.8, 0.36, d + 0.8, roof);
+  bBox(group, 0, height / 2, 0, w, height, d, color);
+  bBox(group, 0, height + 0.18, 0, w + 0.8, 0.36, d + 0.8, 0x46535b);
 
-  // Repeating square windows on all four faces.
-  const floors = Math.max(1, Math.floor(height / 3.5));
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x8db5c4,
-    roughness: 0.22,
-    metalness: 0.2
-  });
-  const frameMat = material(0x59666b);
+  // Windows.
+  const floors = Math.floor((height - 1) / 3.5);
 
   for (let floor = 0; floor < floors; floor++) {
-    const y = 2 + floor * 3.4;
-    if (y > height - 0.8) continue;
+    const y = 2 + floor * 3.5;
 
     for (let wx = -7; wx <= 7; wx += 3.5) {
-      box(group, wx, y, -10.12, 1.55, 1.8, 0.06, windowMat, false);
-      box(group, wx, y, 10.12, 1.55, 1.8, 0.06, windowMat, false);
-      box(group, wx, y, -10.17, 0.08, 1.95, 0.08, frameMat, false);
-      box(group, wx, y, 10.17, 0.08, 1.95, 0.08, frameMat, false);
+      bBox(group, wx, y, -10.12, 1.5, 1.8, 0.06, 0x8dc6d9);
+      bBox(group, wx, y, 10.12, 1.5, 1.8, 0.06, 0x8dc6d9);
+
+      bBox(group, wx - 0.8, y, -10.16, 0.08, 1.95, 0.08, 0x303b43);
+      bBox(group, wx + 0.8, y, -10.16, 0.08, 1.95, 0.08, 0x303b43);
     }
 
     for (let wz = -7; wz <= 7; wz += 3.5) {
-      box(group, -10.12, y, wz, 0.06, 1.8, 1.55, windowMat, false);
-      box(group, 10.12, y, wz, 0.06, 1.8, 1.55, windowMat, false);
+      bBox(group, -10.12, y, wz, 0.06, 1.8, 1.5, 0x8dc6d9);
+      bBox(group, 10.12, y, wz, 0.06, 1.8, 1.5, 0x8dc6d9);
     }
   }
 
-  // Ground floor storefront.
-  if (type !== "Apartment" && type !== "Office Tower") {
-    box(group, 0, 1.6, -10.16, 13, 3.2, 0.1, material(0x202a30));
-    box(group, 0, 1.6, -10.24, 11.8, 2.5, 0.06, windowMat, false);
-    box(group, 0, 3.35, -10.3, 15, 0.25, 0.25, material(signColor));
+  // Shopfront with a central open entrance.
+  const isShop = shopTypes.includes(type);
+
+  if (isShop) {
+    bBox(group, -6, 1.6, -10.2, 6, 3, 0.12, 0x91c6d9);
+    bBox(group, 6, 1.6, -10.2, 6, 3, 0.12, 0x91c6d9);
+    bBox(group, 0, 3.1, -10.25, 12, 0.2, 0.2, signColor);
   }
 
-  if (type === "Office Tower" || type === "Apartment") {
-    addSign(group, name.toUpperCase(), signColor, 11);
-  } else {
-    addSign(group, name.toUpperCase(), signColor, 12);
+  // Main entrance pillars.
+  if (!isShop) {
+    bBox(group, -4.5, 1.7, -10.25, 0.4, 3.4, 0.5, 0xe0ded6);
+    bBox(group, 4.5, 1.7, -10.25, 0.4, 3.4, 0.5, 0xe0ded6);
   }
 
+  // Correctly facing sign.
+  addSign(group, name, signColor, 13);
+
+  // Building data.
   const building = {
-    group, x, z, w, d, height, name, type,
-    room: null,
-    kind: type
+    group,
+    x,
+    z,
+    w,
+    d,
+    height,
+    name,
+    type,
+    room: null
   };
 
-  if (type !== "Office Tower" && type !== "Apartment") {
-    building.room = createInterior(group, type, name);
+  // Only shops and low-rise buildings receive ground-floor interiors.
+  if (height <= 25 || isShop) {
+    building.room = createInterior(building, type, name);
   }
 
   buildings.push(building);
-  buildingColliders.push({ x, z, w, d });
+
+  buildingColliders.push({
+    x, z, w, d, building
+  });
 
   return building;
 }
 
-// Place buildings in safe spaces between the roads.
+/* ---------- Greenfield City layout ---------- */
+
 const cityPlan = [
-  [-125, -125, "MAPLE HOUSE", "Home", 9, 0xd5bd99, 0x92543b],
-  [-75, -125, "NOVA PHONES", "Electronics Store", 12, 0x8d999c, 0x14506c],
-  [-25, -125, "PIZZA PLANET", "Pizza Planet", 8, 0xd6c9ae, 0x9b3028],
-  [25, -125, "CIVIC TOWER", "Office Tower", 58, 0x9aa9ad, 0x21475d],
-  [75, -125, "FASHION HOUSE", "Clothing Store", 9, 0xd7c8ae, 0x8b3760],
-  [125, -125, "GREEN MARKET", "Grocery Shop", 10, 0xc7c0a6, 0x387c48],
+  [-125,-125,"MAPLE HOUSE","Home",9,0xd5bd99,0x92543b],
+  [-75,-125,"NOVA PHONES","Electronics Store",12,0x8d999c,0x14506c],
+  [-25,-125,"PIZZA PLANET","Pizza Planet",8,0xd6c9ae,0x9b3028],
+  [25,-125,"CIVIC TOWER","Office Tower",58,0x9aa9ad,0x21475d],
+  [75,-125,"FASHION HOUSE","Clothing Store",9,0xd7c8ae,0x8b3760],
+  [125,-125,"GREEN MARKET","Grocery Shop",10,0xc7c0a6,0x387c48],
 
-  [-125, -75, "PARKVIEW", "Apartment", 42, 0x9aa7ac, 0x526777],
-  [-75, -75, "BURGER BAR", "Burger Bar", 8, 0xcab99f, 0x98552a],
-  [75, -75, "BOOK WORLD", "Book Shop", 9, 0xc1b9a4, 0x465c9a],
-  [125, -75, "CITY FINANCE", "Bank", 18, 0xb5a98c, 0x6b5735],
+  [-125,-75,"PARKVIEW","Apartment",42,0x9aa7ac,0x526777],
+  [-75,-75,"BURGER BAR","Burger Bar",8,0xcab99f,0x98552a],
+  [75,-75,"BOOK WORLD","Book Shop",9,0xc1b9a4,0x465c9a],
+  [125,-75,"CITY FINANCE","Bank",18,0xb5a98c,0x6b5735],
 
-  [-125, 75, "GREENFIELD HOSPITAL", "Hospital", 25, 0xe2e5e1, 0x9b3030],
-  [-75, 75, "SUNNY TRAVEL", "Travel Agency", 9, 0xc9c0a8, 0x16716f],
-  [75, 75, "LUXE WATCHES", "Watch Shop", 10, 0xaaa69b, 0x28231b],
-  [125, 75, "SKYLINE TOWER", "Office Tower", 64, 0x8e9da5, 0x354a63],
+  [-125,75,"GREENFIELD HOSPITAL","Hospital",25,0xe2e5e1,0x9b3030],
+  [-75,75,"SUNNY TRAVEL","Travel Agency",9,0xc9c0a8,0x16716f],
+  [75,75,"LUXE WATCHES","Watch Shop",10,0xaaa69b,0x28231b],
+  [125,75,"SKYLINE TOWER","Office Tower",64,0x8e9da5,0x354a63],
 
-  [-125, 125, "FAMILY HOUSE", "Home", 8, 0xd8c29e, 0x92543b],
-  [-75, 125, "CITY APARTMENTS", "Apartment", 36, 0x9eaaad, 0x526777],
-  [75, 125, "CORNER STORE", "Grocery Shop", 8, 0xcdbb9e, 0x387c48],
-  [125, 125, "MEDICAL CENTRE", "Hospital", 20, 0xe2e5e1, 0x9b3030]
+  [-125,125,"FAMILY HOUSE","Home",8,0xd8c29e,0x92543b],
+  [-75,125,"CITY APARTMENTS","Apartment",36,0x9eaaad,0x526777],
+  [75,125,"CORNER STORE","Grocery Shop",8,0xcdbb9e,0x387c48],
+  [125,125,"MEDICAL CENTRE","Medical Centre",20,0xe2e5e1,0x9b3030]
 ];
 
-for (const item of cityPlan) createBuilding(...item);
+for (const item of cityPlan) {
+  createBuilding(...item);
+}
 
 /* ---------- Mountain ranges and green hills ---------- */
 
@@ -1600,6 +1969,8 @@ function update(delta, time) {
 
 function animate() {
   requestAnimationFrame(animate);
+updateMobileJoystickKeys();
+updateMobileActionButton();
 
   const delta = Math.min(clock.getDelta(), 0.04);
   const time = clock.elapsedTime;
@@ -1622,10 +1993,9 @@ camera.lookAt(player.position);
 animate();
 
 
-/* =========================================================
-   MOBILE CONTROLS - ROBLOX STYLE
-   Uses the existing player, vehicle and camera systems.
-   ========================================================= */
+/* ==========================================
+   GREENFIELD CITY 3D - MOBILE CONTROLS
+   ========================================== */
 
 let mobileStickX = 0;
 let mobileStickY = 0;
@@ -1635,129 +2005,99 @@ function setupMobileControls() {
   if (mobileControlsReady) return;
   mobileControlsReady = true;
 
-  const isTouchDevice =
-    ("ontouchstart" in window) ||
+  const isMobile =
     navigator.maxTouchPoints > 0 ||
+    "ontouchstart" in window ||
     window.matchMedia("(pointer: coarse)").matches;
 
-  if (!isTouchDevice) return;
+  if (!isMobile) return;
 
-  const style = document.createElement("style");
-  style.textContent = `
+  const css = document.createElement("style");
+
+  css.textContent = `
     #mobile-controls {
       position: fixed;
       inset: 0;
-      z-index: 10000;
+      z-index: 99999;
       pointer-events: none;
-      user-select: none;
-      -webkit-user-select: none;
       touch-action: none;
-      font-family: Arial, sans-serif;
+      user-select: none;
+      font-family: Arial;
     }
 
-    #mobile-camera-zone {
+    #mobile-camera {
       position: absolute;
       right: 0;
-      top: 15%;
+      top: 10%;
       width: 55%;
       height: 65%;
       pointer-events: auto;
       touch-action: none;
-      background: transparent;
     }
 
     #mobile-joystick {
       position: absolute;
-      left: max(24px, env(safe-area-inset-left));
-      bottom: max(28px, env(safe-area-inset-bottom));
-      width: 148px;
-      height: 148px;
+      left: 25px;
+      bottom: 30px;
+      width: 145px;
+      height: 145px;
       border-radius: 50%;
-      background: rgba(35, 45, 55, 0.28);
-      border: 2px solid rgba(255,255,255,0.35);
-      box-shadow: inset 0 2px 12px rgba(0,0,0,0.2);
+      background: rgba(30,40,55,.35);
+      border: 3px solid rgba(255,255,255,.5);
       pointer-events: auto;
       touch-action: none;
-    }
-
-    #mobile-joystick::before {
-      content: "";
-      position: absolute;
-      width: 92px;
-      height: 92px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.16);
-      background: rgba(255,255,255,0.06);
     }
 
     #mobile-stick {
       position: absolute;
-      width: 66px;
-      height: 66px;
       left: 50%;
       top: 50%;
-      transform: translate(-50%, -50%);
+      width: 65px;
+      height: 65px;
       border-radius: 50%;
-      background: linear-gradient(
-        145deg,
-        rgba(255,255,255,0.9),
-        rgba(190,200,210,0.72)
-      );
-      border: 2px solid rgba(255,255,255,0.8);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.32);
+      background: rgba(255,255,255,.9);
+      border: 3px solid white;
+      box-shadow: 0 4px 12px #0006;
+      transform: translate(-50%,-50%);
       pointer-events: none;
     }
 
-    .mobile-round-button {
+    .mobile-button {
       position: absolute;
+      border-radius: 50%;
+      color: white;
+      font-weight: bold;
+      border: 3px solid white;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      border-radius: 50%;
+      text-align: center;
       pointer-events: auto;
       touch-action: none;
-      color: white;
-      font-weight: 800;
-      text-align: center;
-      box-sizing: border-box;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-      -webkit-tap-highlight-color: transparent;
       user-select: none;
+      box-shadow: 0 4px 12px #0006;
     }
 
     #mobile-jump {
-      right: max(28px, env(safe-area-inset-right));
-      bottom: max(35px, env(safe-area-inset-bottom));
-      width: 76px;
-      height: 76px;
-      background: rgba(45, 135, 245, 0.88);
-      border: 3px solid rgba(255,255,255,0.85);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-      font-size: 13px;
+      width: 78px;
+      height: 78px;
+      right: 28px;
+      bottom: 30px;
+      background: #2788ff;
     }
 
-    #mobile-action {
+    #mobile-car {
+      width: 75px;
+      height: 75px;
+      right: 35px;
+      bottom: 125px;
+      background: #19a85b;
       display: none;
-      right: max(35px, env(safe-area-inset-right));
-      bottom: max(128px, calc(env(safe-area-inset-bottom) + 115px));
-      width: 72px;
-      height: 72px;
-      padding: 4px;
-      overflow: hidden;
-      background: rgba(35, 165, 95, 0.94);
-      border: 3px solid rgba(255,255,255,0.9);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-      font-size: 10px;
-      line-height: 1.1;
+      font-size: 12px;
     }
 
-    .mobile-round-button:active {
-      transform: scale(0.93);
-      filter: brightness(1.15);
+    .mobile-button:active {
+      transform: scale(.9);
     }
 
     @media (orientation: portrait) {
@@ -1766,164 +2106,146 @@ function setupMobileControls() {
       }
     }
   `;
-  document.head.appendChild(style);
 
-  const controls = document.createElement("div");
-  controls.id = "mobile-controls";
+  document.head.appendChild(css);
 
-  controls.innerHTML = `
-    <div id="mobile-camera-zone"></div>
+  const ui = document.createElement("div");
+  ui.id = "mobile-controls";
+
+  ui.innerHTML = `
+    <div id="mobile-camera"></div>
 
     <div id="mobile-joystick">
       <div id="mobile-stick"></div>
     </div>
 
-    <button id="mobile-jump" class="mobile-round-button"
-      type="button">JUMP</button>
+    <button id="mobile-jump" class="mobile-button">
+      JUMP
+    </button>
 
-    <button id="mobile-action" class="mobile-round-button"
-      type="button">ENTER<br>CAR</button>
+    <button id="mobile-car" class="mobile-button">
+      ENTER CAR
+    </button>
   `;
 
-  document.body.appendChild(controls);
+  document.body.appendChild(ui);
 
   const joystick = document.getElementById("mobile-joystick");
   const stick = document.getElementById("mobile-stick");
-  const jumpButton = document.getElementById("mobile-jump");
-  const actionButton = document.getElementById("mobile-action");
-  const cameraZone = document.getElementById("mobile-camera-zone");
+  const jump = document.getElementById("mobile-jump");
+  const car = document.getElementById("mobile-car");
+  const camera = document.getElementById("mobile-camera");
 
-  let joystickPointer = null;
-  let cameraPointer = null;
-  let lastCameraX = 0;
-  let lastCameraY = 0;
+  let joyPointer = null;
+  let camPointer = null;
+  let lastX = 0;
+  let lastY = 0;
 
-  const maxStickDistance = 43;
+  const maxDistance = 43;
 
-  function resetJoystick() {
+  /* JOYSTICK */
+
+  function resetStick() {
     mobileStickX = 0;
     mobileStickY = 0;
-    joystickPointer = null;
+
+    joyPointer = null;
 
     stick.style.left = "50%";
     stick.style.top = "50%";
   }
 
-  function moveJoystick(event) {
+  function moveStick(e) {
     const rect = joystick.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
 
-    let dx = event.clientX - centerX;
-    let dy = event.clientY - centerY;
+    let dx = e.clientX - (rect.left + rect.width / 2);
+    let dy = e.clientY - (rect.top + rect.height / 2);
 
     const distance = Math.hypot(dx, dy);
 
-    if (distance > maxStickDistance) {
-      dx = (dx / distance) * maxStickDistance;
-      dy = (dy / distance) * maxStickDistance;
+    if (distance > maxDistance) {
+      dx = dx / distance * maxDistance;
+      dy = dy / distance * maxDistance;
     }
 
-    mobileStickX = dx / maxStickDistance;
-    mobileStickY = dy / maxStickDistance;
+    mobileStickX = dx / maxDistance;
+    mobileStickY = dy / maxDistance;
 
-    stick.style.left =
-      `calc(50% + ${dx}px)`;
-
-    stick.style.top =
-      `calc(50% + ${dy}px)`;
+    stick.style.left = `calc(50% + ${dx}px)`;
+    stick.style.top = `calc(50% + ${dy}px)`;
   }
 
-  joystick.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
+  joystick.addEventListener("pointerdown", e => {
+    e.preventDefault();
 
-    if (joystickPointer !== null) return;
+    if (joyPointer !== null) return;
 
-    joystickPointer = event.pointerId;
-    joystick.setPointerCapture(event.pointerId);
-    moveJoystick(event);
+    joyPointer = e.pointerId;
+    joystick.setPointerCapture(e.pointerId);
+
+    moveStick(e);
   });
 
-  joystick.addEventListener("pointermove", (event) => {
-    if (event.pointerId !== joystickPointer) return;
-    event.preventDefault();
-    moveJoystick(event);
+  joystick.addEventListener("pointermove", e => {
+    if (e.pointerId !== joyPointer) return;
+    moveStick(e);
   });
 
-  joystick.addEventListener("pointerup", (event) => {
-    if (event.pointerId !== joystickPointer) return;
-    resetJoystick();
-  });
+  joystick.addEventListener("pointerup", resetStick);
+  joystick.addEventListener("pointercancel", resetStick);
+  joystick.addEventListener("lostpointercapture", resetStick);
 
-  joystick.addEventListener("pointercancel", resetJoystick);
-  joystick.addEventListener("lostpointercapture", resetJoystick);
+  /* JUMP BUTTON */
 
-  /* Jump button */
-  function releaseJump() {
+  function jumpDown(e) {
+    e.preventDefault();
+    keys.space = true;
+  }
+
+  function jumpUp() {
     keys.space = false;
   }
 
-  jumpButton.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    keys.space = true;
+  jump.addEventListener("pointerdown", jumpDown);
+  jump.addEventListener("pointerup", jumpUp);
+  jump.addEventListener("pointercancel", jumpUp);
+  jump.addEventListener("lostpointercapture", jumpUp);
 
-    try {
-      jumpButton.setPointerCapture(event.pointerId);
-    } catch (_) {}
+  /* CAMERA SWIPE */
+
+  camera.addEventListener("pointerdown", e => {
+    camPointer = e.pointerId;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    camera.setPointerCapture(e.pointerId);
   });
 
-  jumpButton.addEventListener("pointerup", releaseJump);
-  jumpButton.addEventListener("pointercancel", releaseJump);
-  jumpButton.addEventListener("lostpointercapture", releaseJump);
+  camera.addEventListener("pointermove", e => {
+    if (e.pointerId !== camPointer) return;
 
-  /* Camera swipe - no visible instruction text */
-  cameraZone.addEventListener("pointerdown", (event) => {
-    if (cameraPointer !== null) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
 
-    cameraPointer = event.pointerId;
-    lastCameraX = event.clientX;
-    lastCameraY = event.clientY;
+    lastX = e.clientX;
+    lastY = e.clientY;
 
-    cameraZone.setPointerCapture(event.pointerId);
-  });
-
-  cameraZone.addEventListener("pointermove", (event) => {
-    if (event.pointerId !== cameraPointer) return;
-
-    const dx = event.clientX - lastCameraX;
-    const dy = event.clientY - lastCameraY;
-
-    lastCameraX = event.clientX;
-    lastCameraY = event.clientY;
-
-    const sensitivityElement = $("#sensitivityControl");
-    const sensitivity = sensitivityElement
-      ? Number(sensitivityElement.value) / 5
-      : 1;
-
-    playerState.yaw -= dx * 0.004 * sensitivity;
+    playerState.yaw -= dx * 0.004;
 
     playerState.pitch = THREE.MathUtils.clamp(
-      playerState.pitch - dy * 0.003 * sensitivity,
+      playerState.pitch - dy * 0.003,
       -0.8,
       0.45
     );
-
-    event.preventDefault();
   });
 
-  function stopCamera(event) {
-    if (event.pointerId !== cameraPointer) return;
-    cameraPointer = null;
-  }
+  camera.addEventListener("pointerup", () => camPointer = null);
+  camera.addEventListener("pointercancel", () => camPointer = null);
 
-  cameraZone.addEventListener("pointerup", stopCamera);
-  cameraZone.addEventListener("pointercancel", stopCamera);
-  cameraZone.addEventListener("lostpointercapture", stopCamera);
+  /* CAR BUTTON */
 
-  /* Enter/exit car button */
-  actionButton.addEventListener("click", (event) => {
-    event.preventDefault();
+  car.addEventListener("pointerdown", e => {
+    e.preventDefault();
 
     if (playerState.driving) {
       exitVehicle();
@@ -1938,22 +2260,21 @@ function setupMobileControls() {
     updateMobileActionButton();
   });
 
-  /* Release controls if the browser loses focus */
   window.addEventListener("blur", () => {
-    resetJoystick();
-    releaseJump();
-    cameraPointer = null;
+    resetStick();
+    jumpUp();
+    camPointer = null;
   });
 
-  window.addEventListener("contextmenu", (event) => {
-    if (event.target.closest("#mobile-controls")) {
-      event.preventDefault();
+  window.addEventListener("contextmenu", e => {
+    if (e.target.closest("#mobile-controls")) {
+      e.preventDefault();
     }
   });
 }
 
-/* Map joystick direction to the existing keyboard controls.
-   This preserves the original walking and driving systems. */
+/* JOYSTICK MOVEMENT */
+
 function updateMobileJoystickKeys() {
   if (!document.getElementById("mobile-controls")) return;
 
@@ -1965,13 +2286,11 @@ function updateMobileJoystickKeys() {
   const right = mobileStickX > deadZone;
 
   if (playerState.driving) {
-    // Driving: up accelerates, down reverses.
     keys.w = up;
     keys.s = down;
     keys.a = left;
     keys.d = right;
   } else {
-    // Walking: preserve the original game's direction mapping.
     keys.s = up;
     keys.w = down;
     keys.d = left;
@@ -1979,9 +2298,11 @@ function updateMobileJoystickKeys() {
   }
 }
 
-/* Show the circular car button only when a car is nearby. */
+/* CAR BUTTON VISIBILITY */
+
 function updateMobileActionButton() {
-  const button = document.getElementById("mobile-action");
+  const button = document.getElementById("mobile-car");
+
   if (!button) return;
 
   if (playerState.driving) {
@@ -1994,3 +2315,4 @@ function updateMobileActionButton() {
     button.style.display = "none";
   }
 }
+setupMobileControls();
