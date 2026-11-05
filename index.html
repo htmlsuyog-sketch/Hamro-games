@@ -94,5 +94,51 @@
   </div>
 
   <script type="module" src="game.js"></script>
+
+  
+<!-- GREENFIELD CITY MUSIC -->
+
+
+<audio id="cityMusic" src="./music.mp3" loop></audio>
+
+<button id="musicButton" style="
+position:fixed;
+bottom:25px;
+right:25px;
+z-index:999999;
+background:#00cc88;
+color:black;
+padding:15px 22px;
+border:none;
+border-radius:15px;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+">
+🎵 PLAY MUSIC
+</button>
+
+<script>
+(() => {
+  const music = document.getElementById("cityMusic");
+  const button = document.getElementById("musicButton");
+
+  button.addEventListener("click", async () => {
+    try {
+      if (music.paused) {
+        await music.play();
+        button.textContent = "🔇 STOP MUSIC";
+      } else {
+        music.pause();
+        button.textContent = "🎵 PLAY MUSIC";
+      }
+    } catch (error) {
+      alert("Music error: " + error.message);
+      console.error(error);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
